@@ -553,6 +553,10 @@ function evaluateQuestPrerequisites(region, questId, completedByRegion, missions
     badges,
     startZone: rules.start_zone || "",
     npc: rules.npc || "",
+    turninZone: rules.turnin_zone || rules.start_zone || "",
+    turninNpc: rules.turnin_npc || rules.npc || "",
+    objectiveSummary: rules.objective_summary || "",
+    repeatable: Boolean(rules.repeatable),
     targetZones: rules.target_zones || [],
   };
 }
@@ -951,62 +955,32 @@ function buildOptimizedRoute() {
 
     for (const q of toCollect) {
       const zName = q.prereq.startZone || hubInfo.defaultZone;
-      const npcStr = q.prereq.npc ? ` — Talk to ${q.prereq.npc}` : "";
-      const isTownOnly = (q.prereq.targetZones || []).length === 0;
-      steps.push({
-        stepId: `collect:${q.id}`,
-        phase: "Collect",
-        zone: zName,
-        title: q.name,
-        subtitle: `Accept quest in ${zName}${npcStr}${isTownOnly ? " (Town-only: complete immediately!)" : ""}`,
-        wikiUrl: q.wikiUrl,
-      });
+      const npcStr = q.prereq.npc ? `Speak with ${q.prereq.npc} in ${zName}` : `Accept quest in ${zName}`;
+      const goal = q.prereq.objectiveSummary ? ` · Goal: ${q.prereq.objectiveSummary}` : "";
+      steps.push({ stepId: `collect:${q.id}`, phase: "Collect", zone: zName, title: q.name, subtitle: `${npcStr}${goal}`, repeatable: q.prereq.repeatable, wikiUrl: q.wikiUrl });
     }
-
     const fieldTasks = [];
     for (const item of selected) {
       if (item.region === "missions") {
-        fieldTasks.push({
-          stepId: `mission:${item.id}`,
-          phase: "Mission Step",
-          zone: item.prereq.startZone || hubInfo.defaultZone,
-          title: item.name,
-          subtitle: item.detail || "Advance active storyline mission step",
-          wikiUrl: item.wikiUrl,
-        });
+        fieldTasks.push({ stepId: `mission:${item.id}`, phase: "Mission Step", zone: item.prereq.startZone || hubInfo.defaultZone, title: item.name, subtitle: item.detail || "Advance active storyline mission step", repeatable: false, wikiUrl: item.wikiUrl });
       } else {
         const targets = item.prereq.targetZones || [];
-        if (targets.length > 0) {
-          fieldTasks.push({
-            stepId: `do:${item.id}`,
-            phase: "Objective",
-            zone: targets[0],
-            title: item.name,
-            subtitle: `Complete objective in ${targets.join(" / ")}`,
-            wikiUrl: item.wikiUrl,
-          });
+        const obj = item.prereq.objectiveSummary || (targets.length ? `Complete objective in ${targets.join(" / ")}` : "");
+        if (targets.length || obj) {
+          fieldTasks.push({ stepId: `do:${item.id}`, phase: "Objective", zone: targets[0] || item.prereq.startZone || hubInfo.defaultZone, title: item.name, subtitle: targets.length ? `${obj} (${targets.join(" / ")})` : obj, repeatable: item.prereq.repeatable, wikiUrl: item.wikiUrl });
         }
       }
     }
     fieldTasks.sort((a, b) => a.zone.localeCompare(b.zone));
     steps.push(...fieldTasks);
-
-    const toTurnIn = selected.filter((i) => i.region !== "missions");
-    toTurnIn.sort((a, b) => (a.prereq.startZone || "").localeCompare(b.prereq.startZone || ""));
-
+    const toTurnIn = selected.filter((i) => i.region !== "missions").sort((a, b) => (a.prereq.turninZone || a.prereq.startZone || "").localeCompare(b.prereq.turninZone || b.prereq.startZone || ""));
     for (const q of toTurnIn) {
-      const zName = q.prereq.startZone || hubInfo.defaultZone;
-      const npcStr = q.prereq.npc ? ` to ${q.prereq.npc}` : "";
-      steps.push({
-        stepId: `turnin:${q.id}`,
-        phase: "Turn In",
-        zone: zName,
-        title: q.name,
-        subtitle: `Turn in at ${zName}${npcStr}`,
-        wikiUrl: q.wikiUrl,
-      });
+      const zName = q.prereq.turninZone || q.prereq.startZone || hubInfo.defaultZone;
+      const tNpc = q.prereq.turninNpc || q.prereq.npc;
+      const npcStr = tNpc ? `Turn in to ${tNpc} in ${zName}` : `Turn in at ${zName}`;
+      const hint = q.prereq.objectiveSummary ? ` (${q.prereq.objectiveSummary})` : "";
+      steps.push({ stepId: `turnin:${q.id}`, phase: "Turn In", zone: zName, title: q.name, subtitle: `${npcStr}${hint}`, repeatable: q.prereq.repeatable, wikiUrl: q.wikiUrl });
     }
-
     totalStepsCount += steps.length;
     hubPlans.push({
       hubKey,
@@ -1066,7 +1040,7 @@ function renderRouteOptimizer() {
                   <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border ${phaseBadge[step.phase] || ""}">
                     ${escapeHtml(step.phase)}
                   </span>
-                  <span class="text-[11px] font-medium text-slate-300 truncate">${escapeHtml(step.zone)}</span>
+                  <span class="text-[11px] font-medium text-slate-300 truncate">${escapeHtml(step.zone)}</span>${step.repeatable ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Repeatable</span>` : ""}
                 </div>
                 <div class="text-sm font-medium text-slate-100 ${isDone ? "line-through" : ""} truncate">
                   ${escapeHtml(step.title)}
