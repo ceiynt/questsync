@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE = "https://questsync-arnx.onrender.com/";
+const DEFAULT_API_BASE = "https://questsync-arnx.onrender.com";
 
 const urlApiParam = new URLSearchParams(window.location.search).get("api");
 if (urlApiParam) {
