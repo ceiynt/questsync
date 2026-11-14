@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>CatsEyeXI QuestSync</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" href="./icon-192.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-[calc(4rem+env(safe-area-inset-bottom))] antialiased selection:bg-indigo-500 selection:text-white">
+
+  <header class="sticky top-0 z-30 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3">
+    <div class="max-w-xl mx-auto flex items-center justify-between gap-2">
+      <div>
+        <h1 class="text-base font-bold tracking-tight text-indigo-400">CatsEyeXI QuestSync</h1>
+        <p id="syncStatus" class="text-xs text-slate-400">Connecting...</p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <select id="characterSelect" aria-label="Select Character"
+          class="bg-slate-800 border border-slate-700 text-sm rounded-lg px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-indigo-500">
+        </select>
+        <button id="refreshBtn" title="Refresh"
+          class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 active:scale-95 transition">
+          ↻
+        </button>
+        <button id="settingsBtn" title="Settings"
+          class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 active:scale-95 transition">
+          ⚙
+        </button>
+      </div>
+    </div>
+
+    <!-- Primary 4-Tab Switcher: Quests | Route | Equipment | Crafting -->
+    <div class="max-w-xl mx-auto mt-3 grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+      <button id="tabQuestsBtn" class="py-2 rounded-lg bg-indigo-600 text-white transition">Quests</button>
+      <button id="tabRouteBtn" class="py-2 rounded-lg text-slate-400 hover:text-slate-200 transition">Route</button>
+      <button id="tabEquipmentBtn" class="py-2 rounded-lg text-slate-400 hover:text-slate-200 transition">Equipment</button>
+      <button id="tabCraftingBtn" class="py-2 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1">
+        <span>Crafting</span>
+        <span id="queueNavBadge" class="hidden text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950 font-bold">0</span>
+      </button>
+    </div>
+
+    <!-- Settings Drawer -->
+    <div id="settingsPanel" class="hidden max-w-xl mx-auto mt-3 pt-3 border-t border-slate-800 space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1">FastAPI Backend Base URL</label>
+        <div class="flex gap-2">
+          <input id="apiBaseInput" type="url" placeholder="https://your-api-domain.com"
+            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500" />
+          <button id="saveApiBtn"
+            class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium">
+            Save
+          </button>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-800/80">
+        <span class="block text-xs font-medium text-slate-300 mb-2">Default Quest &amp; Mission Filter Settings</span>
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <label class="flex items-center justify-between bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-2 cursor-pointer">
+            <span class="text-slate-200">Not Collected</span>
+            <input id="defaultNotCollected" type="checkbox" checked class="accent-indigo-500 h-4 w-4 rounded" />
+          </label>
+          <label class="flex items-center justify-between bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-2 cursor-pointer">
+            <span class="text-amber-300">Collected</span>
+            <input id="defaultCollected" type="checkbox" checked class="accent-amber-500 h-4 w-4 rounded" />
+          </label>
+          <label class="flex items-center justify-between bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-2 cursor-pointer">
+            <span class="text-emerald-400">Complete</span>
+            <input id="defaultComplete" type="checkbox" checked class="accent-emerald-500 h-4 w-4 rounded" />
+          </label>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- VIEW 1: QUEST & MISSION TRACKER -->
+  <main id="questsView" class="max-w-xl mx-auto px-4 pt-4 space-y-3.5">
+    <section class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <div class="flex justify-between items-baseline mb-2">
+        <span id="progressLabel" class="text-sm font-semibold text-slate-200">Overall Progress</span>
+        <span id="progressCount" class="text-xs font-mono text-indigo-400">0 / 0 (0%)</span>
+      </div>
+      <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+        <div id="progressBar" class="h-full bg-indigo-500 transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </section>
+
+    <section class="space-y-2.5">
+      <div class="flex gap-2">
+        <input id="searchInput" type="search" placeholder="Search quests or missions..."
+          class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+        <select id="regionSelect" aria-label="Filter by Region"
+          class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+          <option value="all">All Categories</option>
+          <option value="missions">Storyline Missions</option>
+          <option value="custom">CatsEyeXI Custom</option>
+          <option value="sandoria">San d'Oria</option>
+          <option value="bastok">Bastok</option>
+          <option value="windurst">Windurst</option>
+          <option value="jeuno">Jeuno</option>
+          <option value="other">Other Areas</option>
+          <option value="outlands">Outlands</option>
+          <option value="toau">Aht Urhgan</option>
+          <option value="wotg">Wings of the Goddess</option>
+          <option value="abyssea">Abyssea</option>
+          <option value="soa">Seekers of Adoulin</option>
+          <option value="coalition">Coalitions</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <select id="prereqEligibilitySelect" aria-label="Filter by Prerequisite Eligibility"
+          class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500">
+          <option value="all">Eligibility: Show All</option>
+          <option value="eligible">Able to Collect Now</option>
+          <option value="blocked">Missing Prereqs</option>
+        </select>
+
+        <select id="prereqTypeSelect" aria-label="Filter by Prerequisite Type"
+          class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500">
+          <option value="all">Prereq Type: Any</option>
+          <option value="job_level">Job / Level Prereq</option>
+          <option value="fame">Nation Fame Prereq</option>
+          <option value="skill">Profession Skill Prereq</option>
+          <option value="mission">Mission Progression</option>
+          <option value="chain">Progressive Quest Chain</option>
+          <option value="flagged">Other Flagged Prereqs</option>
+        </select>
+      </div>
+
+      <div class="bg-slate-900 p-2 rounded-xl border border-slate-800 space-y-2">
+        <div class="flex items-center justify-between px-1">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Status Toggles</span>
+          <button id="toggleAllFiltersBtn" type="button"
+            class="text-[11px] font-medium text-indigo-400 hover:text-indigo-300">
+            Show All
+          </button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-1.5 text-xs font-medium">
+          <button type="button" data-filter="not_collected" aria-pressed="true"
+            class="status-toggle flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg border transition">
+            <span class="toggle-dot w-2 h-2 rounded-full"></span>
+            <span>Not Collected</span>
+          </button>
+
+          <button type="button" data-filter="collected" aria-pressed="true"
+            class="status-toggle flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg border transition">
+            <span class="toggle-dot w-2 h-2 rounded-full"></span>
+            <span>Collected</span>
+          </button>
+
+          <button type="button" data-filter="complete" aria-pressed="true"
+            class="status-toggle flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg border transition">
+            <span class="toggle-dot w-2 h-2 rounded-full"></span>
+            <span>Complete</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="questList" class="space-y-2"></section>
+  </main>
+
+  <!-- VIEW 2: ROUTE OPTIMIZER -->
+  <main id="routeView" class="hidden max-w-xl mx-auto px-4 pt-4 space-y-3.5">
+    <section id="syncedStatsBanner" class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 space-y-2"></section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 space-y-2.5">
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <label for="routeStartHubSelect" class="block text-[11px] text-slate-400 mb-1">Starting Region Hub</label>
+          <select id="routeStartHubSelect"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-100 focus:outline-none focus:border-indigo-500">
+            <option value="auto">Auto (Current Game Zone)</option>
+            <option value="sandoria">San d'Oria &amp; Ronfaure</option>
+            <option value="bastok">Bastok &amp; Gustaberg</option>
+            <option value="windurst">Windurst &amp; Sarutabaruta</option>
+            <option value="jeuno">Jeuno &amp; Qufim</option>
+            <option value="selbina_valkurm">Selbina &amp; Valkurm</option>
+            <option value="mhaura_buburimu">Mhaura &amp; Buburimu</option>
+            <option value="outlands">Norg, Kazham &amp; Outlands</option>
+            <option value="toau">Aht Urhgan</option>
+            <option value="wotg">Shadowreign [S]</option>
+            <option value="abyssea">Abyssea</option>
+            <option value="soa">Adoulin</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="routeScopeSelect" class="block text-[11px] text-slate-400 mb-1">Route Scope</label>
+          <select id="routeScopeSelect"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-100 focus:outline-none focus:border-indigo-500">
+            <option value="local_hub">Current Hub Only (Zero Travel)</option>
+            <option value="nearby_2">Current + Nearest Hub</option>
+            <option value="all_world">Full Vana'diel Tour</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-1.5 text-[11px] pt-1">
+        <label class="flex items-center justify-between bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-1.5 cursor-pointer">
+          <span class="text-indigo-300 font-medium">Missions</span>
+          <input id="routeIncMissions" type="checkbox" checked class="accent-indigo-500 h-3.5 w-3.5" />
+        </label>
+        <label class="flex items-center justify-between bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-1.5 cursor-pointer">
+          <span class="text-amber-300 font-medium">Collected</span>
+          <input id="routeIncCollected" type="checkbox" checked class="accent-amber-500 h-3.5 w-3.5" />
+        </label>
+        <label class="flex items-center justify-between bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-1.5 cursor-pointer">
+          <span class="text-emerald-300 font-medium">New Eligible</span>
+          <input id="routeIncEligible" type="checkbox" checked class="accent-emerald-500 h-3.5 w-3.5" />
+        </label>
+      </div>
+
+      <div class="flex items-center justify-between text-xs pt-1">
+        <div class="flex items-center gap-2">
+          <label for="routeBatchSizeSelect" class="text-slate-400">Max Quests:</label>
+          <select id="routeBatchSizeSelect"
+            class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-slate-100">
+            <option value="10">10 quests</option>
+            <option value="20" selected>20 quests</option>
+            <option value="35">35 quests</option>
+          </select>
+        </div>
+        <button id="clearRouteChecksBtn" type="button"
+          class="text-[11px] text-slate-400 hover:text-indigo-300">
+          Reset Checkmarks
+        </button>
+      </div>
+    </section>
+
+    <div id="routeSummaryBar" class="flex justify-between items-center text-xs text-slate-400 px-1"></div>
+    <section id="routeStepsList" class="space-y-3"></section>
+  </main>
+
+  <!-- VIEW 3: EQUIPMENT REPOSITORY -->
+  <main id="equipmentView" class="hidden max-w-xl mx-auto px-4 pt-4 space-y-3">
+    <div class="flex gap-2">
+      <input id="equipSearchInput" type="search" placeholder="Search gear or stats (e.g. Bronze, Haste, STR)..."
+        class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+      <input id="equipMaxLvlInput" type="number" min="1" max="99" placeholder="Max Lv" aria-label="Max Equipment Level"
+        class="w-20 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 text-center font-mono focus:outline-none focus:border-indigo-500" />
+    </div>
+
+    <div class="grid grid-cols-3 gap-2 text-xs">
+      <select id="equipJobSelect" aria-label="Filter by Job"
+        class="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-2 text-slate-100 focus:outline-none focus:border-indigo-500">
+        <option value="all">All Jobs</option>
+        <option value="WAR">WAR</option>
+        <option value="MNK">MNK</option>
+        <option value="WHM">WHM</option>
+        <option value="BLM">BLM</option>
+        <option value="RDM">RDM</option>
+        <option value="THF">THF</option>
+        <option value="PLD">PLD</option>
+        <option value="DRK">DRK</option>
+        <option value="BST">BST</option>
+        <option value="BRD">BRD</option>
+        <option value="RNG">RNG</option>
+        <option value="SAM">SAM</option>
+        <option value="NIN">NIN</option>
+        <option value="DRG">DRG</option>
+        <option value="SMN">SMN</option>
+        <option value="BLU">BLU</option>
+        <option value="COR">COR</option>
+        <option value="PUP">PUP</option>
+        <option value="DNC">DNC</option>
+        <option value="SCH">SCH</option>
+        <option value="GEO">GEO</option>
+        <option value="RUN">RUN</option>
+      </select>
+
+      <select id="equipSlotSelect" aria-label="Filter by Equip Slot"
+        class="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-2 text-slate-100 focus:outline-none focus:border-indigo-500">
+        <option value="all">All Slots</option>
+        <option value="Main">Main</option>
+        <option value="Sub">Sub</option>
+        <option value="Range">Range</option>
+        <option value="Ammo">Ammo</option>
+        <option value="Head">Head</option>
+        <option value="Body">Body</option>
+        <option value="Hands">Hands</option>
+        <option value="Legs">Legs</option>
+        <option value="Feet">Feet</option>
+        <option value="Neck">Neck</option>
+        <option value="Waist">Waist</option>
+        <option value="Ear">Ear</option>
+        <option value="Ring">Ring</option>
+        <option value="Back">Back</option>
+      </select>
+
+      <select id="equipOwnedSelect" aria-label="Filter by Ownership"
+        class="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-2 text-slate-100 focus:outline-none focus:border-indigo-500">
+        <option value="all">Owned &amp; All</option>
+        <option value="owned">Owned Only</option>
+        <option value="unowned">Unowned Only</option>
+      </select>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2 text-xs">
+      <select id="equipCraftableSelect" aria-label="Filter by Craftability"
+        class="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-2 text-slate-100 focus:outline-none focus:border-indigo-500">
+        <option value="all">Craftable: Show All</option>
+        <option value="craftable">Craftable Only</option>
+        <option value="within_skill">Craftable (Within Synced Skill)</option>
+      </select>
+
+      <select id="equipCraftSkillSelect" aria-label="Filter by Specific Crafting Skill"
+        class="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-2 text-slate-100 focus:outline-none focus:border-indigo-500">
+        <option value="all">Skill: All Crafts</option>
+        <option value="Woodworking">Woodworking</option>
+        <option value="Smithing">Smithing</option>
+        <option value="Goldsmithing">Goldsmithing</option>
+        <option value="Clothcraft">Clothcraft</option>
+        <option value="Leathercraft">Leathercraft</option>
+        <option value="Bonecraft">Bonecraft</option>
+        <option value="Alchemy">Alchemy</option>
+        <option value="Cooking">Cooking</option>
+      </select>
+    </div>
+
+    <div id="equipSummaryBar" class="flex justify-between items-center text-[11px] text-slate-400 px-1"></div>
+    <section id="equipmentList" class="space-y-2"></section>
+  </main>
+
+  <!-- VIEW 4: CRAFTING QUEUE, SHOPPING LIST & RECIPE CALCULATOR -->
+  <main id="craftingView" class="hidden max-w-xl mx-auto px-4 pt-4 space-y-4">
+    <!-- Multi-Item Crafting Queue & Shopping/Gathering List -->
+    <section id="craftingQueueCard" class="bg-slate-900 border border-emerald-500/40 rounded-xl p-4 space-y-3.5"></section>
+
+    <!-- Single Recipe Search & Queue Adder -->
+    <section class="space-y-2 pt-2 border-t border-slate-800/80">
+      <div class="flex items-center justify-between px-1">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Browse &amp; Add Recipes</span>
+        <span class="text-[11px] text-slate-500">Tap "+ Queue" to batch multiple items</span>
+      </div>
+
+      <div class="flex gap-2">
+        <input id="recipeSearchInput" type="search" placeholder="Search item to craft (e.g. Bronze Harness, Bronze Cap)..."
+          class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+        <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-2.5">
+          <label for="synthCountInput" class="text-xs text-slate-400 mr-1.5">Synths:</label>
+          <input id="synthCountInput" type="number" min="1" max="999" value="1"
+            class="w-12 bg-transparent text-sm font-mono text-slate-100 text-right focus:outline-none" />
+        </div>
+      </div>
+    </section>
+
+    <section id="recipeDetailCard" class="hidden bg-slate-900 border border-indigo-500/40 rounded-xl p-4 space-y-4"></section>
+    <section id="recipeList" class="space-y-2"></section>
+  </main>
+
+  <script src="./quests_db.js"></script>
+  <script src="./quest_prereqs.js"></script>
+  <script src="./equipment_db.js"></script>
+  <script src="./recipes_db.js"></script>
+  <script src="./material_sources.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
