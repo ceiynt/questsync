@@ -1351,7 +1351,7 @@ function getMaterialPriceAndSources(itemId) {
   };
 }
 
-function formatRecipeSummary(recipe) {
+function formatRecipeSummary(recipe, itemNames) {
   if (!recipe) return "";
   const crystalName = itemNames[String(recipe.crystal_id)] || "";
   const ingSummary = (recipe.ingredients || [])
@@ -1576,7 +1576,7 @@ function renderCraftingQueueCard() {
             ${escapeHtml(recipe.name)} ${recipe.result_qty > 1 ? `(×${recipe.result_qty * qItem.synths})` : ""}
           </div>
           <div class="text-[11px] text-slate-400">${escapeHtml(skillStr)}</div>
-          <div class="text-[11px] text-slate-300/90 mt-0.5 truncate">${escapeHtml(formatRecipeSummary(recipe))}</div>
+          <div class="text-[11px] text-slate-300/90 mt-0.5 truncate">${escapeHtml(formatRecipeSummary(recipe, itemNames))}</div>
         </div>
 
         <div class="flex items-center gap-1.5 shrink-0">
@@ -1638,7 +1638,7 @@ function renderCraftingQueueCard() {
                       <span class="text-[11px] text-slate-400">(Need ${sub.missingQty})</span>
                     </div>
                     <div class="text-[11px] text-slate-400">${escapeHtml(skillStr)}</div>
-                    <div class="text-[11px] text-slate-300/90 mt-0.5 truncate">${escapeHtml(formatRecipeSummary(sub.recipe))}</div>
+                    <div class="text-[11px] text-slate-300/90 mt-0.5 truncate">${escapeHtml(formatRecipeSummary(sub.recipe, itemNames))}</div>
                   </div>
 
                   ${sub.missingQty > 0 ? `
