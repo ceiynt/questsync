@@ -961,6 +961,7 @@ function buildOptimizedRoute() {
     }
     const fieldTasks = [];
     for (const item of selected) {
+      if (item.region !== "missions" && item.status !== "collected") continue;
       if (item.region === "missions") {
         fieldTasks.push({ stepId: `mission:${item.id}`, phase: "Mission Step", zone: item.prereq.startZone || hubInfo.defaultZone, title: item.name, subtitle: item.detail || "Advance active storyline mission step", repeatable: false, wikiUrl: item.wikiUrl });
       } else {
@@ -973,7 +974,7 @@ function buildOptimizedRoute() {
     }
     fieldTasks.sort((a, b) => a.zone.localeCompare(b.zone));
     steps.push(...fieldTasks);
-    const toTurnIn = selected.filter((i) => i.region !== "missions").sort((a, b) => (a.prereq.turninZone || a.prereq.startZone || "").localeCompare(b.prereq.turninZone || b.prereq.startZone || ""));
+    const toTurnIn = selected.filter((i) => i.region !== "missions" && i.status === "collected").sort((a, b) => (a.prereq.turninZone || a.prereq.startZone || "").localeCompare(b.prereq.turninZone || b.prereq.startZone || ""));
     for (const q of toTurnIn) {
       const zName = q.prereq.turninZone || q.prereq.startZone || hubInfo.defaultZone;
       const tNpc = q.prereq.turninNpc || q.prereq.npc;
